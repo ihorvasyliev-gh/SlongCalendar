@@ -1,0 +1,16 @@
+{
+  "name": "susan-booking-bot",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  "vars": {
+    "SUPABASE_URL": "https://jswlxqfiizbxwlbtfpum.supabase.co",
+    "GOOGLE_SERVICE_ACCOUNT_EMAIL": "",
+    "GOOGLE_CALENDAR_ID": "primary",
+    "BUSINESS_TIMEZONE": "Europe/Dublin",
+    "BUSINESS_START_HOUR": "9",
+    "BUSINESS_END_HOUR": "17",
+    "SLOT_DURATION_MINS": "60",
+    "SLOT_BUFFER_MINS": "0",
+    "BOOKING_URL": "https://slong-booking.pages.dev"
+  }
+}

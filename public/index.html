@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Susan Booking System</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0b0f19; /* Deep Space Slate */
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .ambient-glow {
+      position: absolute;
+      top: -10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(79, 70, 229, 0.15) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Custom scrollbar for slot list */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.3);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.5);
+    }
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(12px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-slide-in {
+      animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="text-slate-200 antialiased min-h-screen relative flex flex-col justify-between overflow-x-hidden">
+  
+  <div class="ambient-glow"></div>
+
+  <!-- React Mount Point -->
+  <div id="root" class="relative z-10 w-full max-w-5xl mx-auto px-4 py-8 flex-grow flex items-center justify-center">
+    <!-- Server-Side Preloader / Skeleton -->
+    <div class="text-center">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+      <p class="text-slate-400 font-medium">Loading booking portal...</p>
+    </div>
+  </div>
+
+  <footer class="relative z-10 w-full text-center py-6 border-t border-slate-900/60 text-slate-500 text-xs">
+    <p>&copy; 2026 Susan Booking System. All rights reserved. 100% Free & Self-Hosted.</p>
+  </footer>
+
+  <!-- Load React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+
+  <!-- React Code using Babel -->
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- CONFIGURATION ---
+    const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? 'http://127.0.0.1:8787'
+      : 'https://susan-booking-bot.b1ackproff.workers.dev'; // Replace with your actual Worker URL
+    // ---------------------
+
+    function BookingApp() {
+      const [token, setToken] = useState('');
+      const [isValidatingToken, setIsValidatingToken] = useState(true);
+      const [tokenData, setTokenData] = useState(null); // { valid: boolean, platform: string }
+      
+      const [currentScreen, setCurrentScreen] = useState('calendar'); // 'calendar', 'form', 'success'
+      const [currentMonth, setCurrentMonth] = useState(() => {
+        const d = new Date();
+        d.setDate(1);
+        return d;
+      });
+      const [selectedDate, setSelectedDate] = useState(''); // YYYY-MM-DD
+      const [slots, setSlots] = useState([]);
+      const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+      const [selectedSlotCandidate, setSelectedSlotCandidate] = useState(null); // { start: string, end: string }
+      const [selectedSlot, setSelectedSlot] = useState(null); // { start: string, end: string }
+
+      const [name, setName] = useState('');
+      const [email, setEmail] = useState('');
+      const [phone, setPhone] = useState('');
+      const [isSubmitting, setIsSubmitting] = useState(false);
+      const [bookingSuccess, setBookingSuccess] = useState(null);
+      const [error, setError] = useState('');
+      const [userTimezone, setUserTimezone] = useState('UTC');
+
+      // Get token from URL parameters
+      useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token') || 'demo';
+        setToken(urlToken);
+        validateToken(urlToken);
+
+        // Detect user timezone
+        try {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          if (tz) setUserTimezone(tz);
+        } catch (e) {
+          console.error("Timezone detection failed", e);
+        }
+      }, []);
+
+      // Fetch slots when selectedDate or token changes
+      useEffect(() => {
+        if (token && selectedDate && tokenData && tokenData.valid) {
+          fetchSlots(selectedDate);
+        }
+      }, [selectedDate, tokenData]);
+
+      const validateToken = async (tokenStr) => {
+        if (tokenStr === 'demo') {
+          setTokenData({ valid: true, platform: 'instagram' });
+          setIsValidatingToken(false);
+          return;
+        }
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/validate-token?token=${encodeURIComponent(tokenStr)}`);
+          if (res.ok) {
+            const data = await res.json();
+            setTokenData(data);
+          } else {
+            setTokenData({ valid: false });
+          }
+        } catch (err) {
+          console.error(err);
+          setTokenData({ valid: false });
+        } finally {
+          setIsValidatingToken(false);
+        }
+      };
+
+      const fetchSlots = async (dateStr) => {
+        setIsLoadingSlots(true);
+        setSelectedSlotCandidate(null);
+        setError('');
+        if (token === 'demo') {
+          // Simulate API call for demo token
+          setTimeout(() => {
+            const mockSlots = [
+              { start: `${dateStr}T09:00:00.000Z`, end: `${dateStr}T10:00:00.000Z` },
+              { start: `${dateStr}T10:30:00.000Z`, end: `${dateStr}T11:30:00.000Z` },
+              { start: `${dateStr}T13:00:00.000Z`, end: `${dateStr}T14:00:00.000Z` },
+              { start: `${dateStr}T14:30:00.000Z`, end: `${dateStr}T15:30:00.000Z` },
+              { start: `${dateStr}T16:00:00.000Z`, end: `${dateStr}T17:00:00.000Z` }
+            ];
+            setSlots(mockSlots);
+            setIsLoadingSlots(false);
+          }, 400);
+          return;
+        }
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/available-slots?token=${encodeURIComponent(token)}&date=${dateStr}`);
+          if (res.ok) {
+            const data = await res.json();
+            setSlots(data.slots || []);
+          } else {
+            const errData = await res.json();
+            setError(errData.error || 'Failed to fetch slots.');
+          }
+        } catch (err) {
+          setError('Could not connect to the booking server.');
+        } finally {
+          setIsLoadingSlots(false);
+        }
+      };
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedSlot) return;
+
+        setIsSubmitting(true);
+        setError('');
+
+        if (token === 'demo') {
+          setTimeout(() => {
+            setBookingSuccess({
+              client_name: name,
+              client_email: email,
+              start_time: selectedSlot.start,
+              end_time: selectedSlot.end
+            });
+            setCurrentScreen('success');
+            setIsSubmitting(false);
+          }, 800);
+          return;
+        }
+
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/book`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              token,
+              name,
+              email,
+              phone,
+              slotStart: selectedSlot.start
+            })
+          });
+
+          const data = await res.json();
+
+          if (res.ok) {
+            setBookingSuccess(data.appointment);
+            setCurrentScreen('success');
+          } else {
+            setError(data.error || 'Booking failed. The slot may have been taken.');
+          }
+        } catch (err) {
+          setError('Network error occurred during booking. Please try again.');
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
+
+      // Helper: Format Time Local
+      const formatTimeLocal = (isoString) => {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      };
+
+      // Helper: Format Date Local
+      const formatDateLocal = (isoString) => {
+        const date = new Date(isoString);
+        return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+      };
+
+      // Helper: Format Full Date and Time summary
+      const formatSlotRange = (slot) => {
+        if (!slot) return '';
+        const start = new Date(slot.start);
+        const end = new Date(slot.end);
+        const timeStr = `${start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        const dateStr = start.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        return `${timeStr}, ${dateStr}`;
+      };
+
+      // --- CALENDAR LOGIC ---
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const isDateAvailable = (date) => {
+        if (!date) return false;
+        
+        // Skip Sundays
+        if (date.getDay() === 0) return false;
+
+        // Check if within 30-day limit
+        const limitDate = new Date();
+        limitDate.setDate(today.getDate() + 30);
+        limitDate.setHours(23, 59, 59, 999);
+
+        return date >= today && date <= limitDate;
+      };
+
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const totalDays = new Date(year, month + 1, 0).getDate();
+
+      const calendarCells = [];
+      for (let i = 0; i < firstDayIndex; i++) {
+        calendarCells.push(null);
+      }
+      for (let d = 1; d <= totalDays; d++) {
+        calendarCells.push(new Date(year, month, d));
+      }
+
+      const handlePrevMonth = () => {
+        setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+      };
+
+      const handleNextMonth = () => {
+        setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+      };
+
+      const isPrevMonthDisabled = year <= today.getFullYear() && month <= today.getMonth();
+      
+      const horizonLimit = new Date();
+      horizonLimit.setDate(today.getDate() + 30);
+      const isNextMonthDisabled = year >= horizonLimit.getFullYear() && month >= horizonLimit.getMonth();
+
+      // --- RENDER STATES ---
+
+      // 1. Loading State
+      if (isValidatingToken) {
+        return (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+            <p className="text-slate-400 font-medium">Validating secure token...</p>
+          </div>
+        );
+      }
+
+      // 2. Token Invalid State
+      if (!tokenData || !tokenData.valid) {
+        return (
+          <div className="glass-card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl border border-red-950/30 animate-fade-in">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 text-red-500 mb-6">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-100 mb-3">Expired or Invalid Token</h2>
+            <p className="text-slate-400 text-sm leading-relaxed mb-6">
+              This link is either expired (tokens last 24 hours), already used, or invalid. Please send a new message in our chat to get a fresh booking link.
+            </p>
+          </div>
+        );
+      }
+
+      // 3. Main Split-screen App Container
+      return (
+        <div className="glass-card rounded-2xl shadow-2xl border border-slate-800/80 w-full max-w-5xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[600px] animate-fade-in">
+          
+          {/* LEFT COLUMN: Host & Meeting Details */}
+          <div className="lg:col-span-4 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col justify-between bg-slate-900/20">
+            <div>
+              {/* Profile Avatar / Branding */}
+              <div className="relative mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-indigo-500/20">
+                  S
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center" title="Online">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                </div>
+              </div>
+
+              {/* Host Name & Title */}
+              <p className="text-slate-400 text-sm font-semibold tracking-wide">Susan</p>
+              <h1 className="text-xl md:text-2xl font-bold text-white mt-1 mb-6">1-on-1 Consultation</h1>
+
+              {/* Details List */}
+              <div className="space-y-4 text-sm text-slate-300">
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span className="font-medium">60 Mins</span>
+                </div>
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                  <span className="font-medium">Online/Chat support</span>
+                </div>
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span className="font-medium capitalize">{tokenData.platform === 'instagram' ? 'Instagram Direct' : 'Facebook Messenger'}</span>
+                </div>
+              </div>
+
+              {/* Description */}
+              <p className="text-slate-400 text-xs md:text-sm mt-6 leading-relaxed">
+                Welcome! Please select an available date and time slot. Our appointment will be synced automatically, and a confirmation text will be sent to your {tokenData.platform === 'instagram' ? 'Instagram' : 'Facebook Messenger'} thread.
+              </p>
+            </div>
+
+            {/* Date/Time Selection Summary Card */}
+            {(currentScreen === 'form' || currentScreen === 'success') && selectedSlot && (
+              <div className="mt-8 pt-6 border-t border-slate-800/80 animate-fade-in">
+                <div className="flex items-start bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-400 mr-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <div className="text-xs">
+                    <p className="text-indigo-300 font-semibold uppercase tracking-wider mb-1">Selected Appointment</p>
+                    <p className="text-slate-200 font-semibold text-sm leading-snug">{formatSlotRange(selectedSlot)}</p>
+                    <p className="text-slate-400 mt-1 font-medium">{userTimezone} Timezone</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Interactive Work Area */}
+          <div className="lg:col-span-8 p-6 md:p-8 flex flex-col justify-center">
+
+            {/* SCREEN 1: CALENDAR & SLOTS */}
+            {currentScreen === 'calendar' && (
+              <div className="space-y-6">
+                
+                {/* Heading */}
+                <h2 className="text-lg md:text-xl font-bold text-white mb-2">Select a Date & Time</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                  
+                  {/* Monthly Calendar View */}
+                  <div className={`transition-all duration-300 ${selectedDate ? 'md:col-span-7' : 'md:col-span-12 max-w-md mx-auto w-full'}`}>
+                    
+                    {/* Calendar Month Header */}
+                    <div className="flex items-center justify-between mb-6">
+                      <span className="text-base font-bold text-slate-100">
+                        {monthNames[month]} {year}
+                      </span>
+                      <div className="flex space-x-2">
+                        <button
+                          disabled={isPrevMonthDisabled}
+                          onClick={handlePrevMonth}
+                          className="p-2 rounded-lg border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                        <button
+                          disabled={isNextMonthDisabled}
+                          onClick={handleNextMonth}
+                          className="p-2 rounded-lg border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Weekday Names */}
+                    <div className="grid grid-cols-7 gap-y-2 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+                      {weekdays.map(day => (
+                        <div key={day} className="h-6 flex items-center justify-center">{day[0]}</div>
+                      ))}
+                    </div>
+
+                    {/* Days Grid */}
+                    <div className="grid grid-cols-7 gap-y-3 gap-x-2 text-center text-sm">
+                      {calendarCells.map((date, idx) => {
+                        if (!date) {
+                          return <div key={`empty-${idx}`} className="h-10"></div>;
+                        }
+                        const isAvailable = isDateAvailable(date);
+                        const dateStr = date.toISOString().split('T')[0];
+                        const isSelected = selectedDate === dateStr;
+
+                        return (
+                          <button
+                            key={dateStr}
+                            disabled={!isAvailable}
+                            onClick={() => setSelectedDate(dateStr)}
+                            className={`h-10 w-10 mx-auto rounded-full flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/30 scale-105'
+                                : isAvailable
+                                  ? 'bg-indigo-500/10 text-indigo-400 font-bold hover:bg-indigo-600 hover:text-white'
+                                  : 'text-slate-700 cursor-not-allowed'
+                            }`}
+                          >
+                            {date.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Timezone Info */}
+                    <div className="mt-8 flex items-center justify-center md:justify-start text-xs text-slate-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      <span>Timezone: <strong className="text-slate-400 font-semibold">{userTimezone}</strong></span>
+                    </div>
+
+                  </div>
+
+                  {/* Vertical Slide-out Time Slots Picker */}
+                  {selectedDate && (
+                    <div className="md:col-span-5 space-y-4 animate-slide-in">
+                      {/* Selected Day Name Header */}
+                      <p className="text-sm font-semibold text-slate-400 capitalize">
+                        {new Date(selectedDate).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
+                      </p>
+
+                      {isLoadingSlots ? (
+                        <div className="space-y-3">
+                          {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="h-12 bg-slate-800/30 animate-pulse rounded-xl border border-slate-900"></div>
+                          ))}
+                        </div>
+                      ) : slots.length > 0 ? (
+                        <div className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                          {slots.map((slot) => {
+                            const isCandidate = selectedSlotCandidate && selectedSlotCandidate.start === slot.start;
+                            return (
+                              <div key={slot.start} className="flex gap-2 transition-all duration-200">
+                                <button
+                                  onClick={() => setSelectedSlotCandidate(slot)}
+                                  className={`flex-grow py-3.5 px-4 rounded-xl border text-sm font-semibold transition-all duration-200 ${
+                                    isCandidate
+                                      ? 'bg-slate-800/60 border-slate-700 text-indigo-400 w-1/2'
+                                      : 'border-slate-800 bg-slate-900/40 text-slate-200 hover:border-indigo-500/50 hover:bg-slate-800/20 w-full'
+                                  }`}
+                                >
+                                  {formatTimeLocal(slot.start)}
+                                </button>
+                                {isCandidate && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedSlot(slot);
+                                      setCurrentScreen('form');
+                                    }}
+                                    className="w-1/2 py-3.5 px-4 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-sm hover:bg-indigo-500 transition-all duration-200 shadow-md shadow-indigo-600/10 animate-fade-in"
+                                  >
+                                    Next
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-10 bg-slate-900/20 border border-slate-900 rounded-xl flex flex-col items-center justify-center space-y-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>
+                          <p className="text-sm text-slate-500 font-medium">No slots available today</p>
+                          <p className="text-xs text-slate-600">Please choose another calendar date.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+
+                {error && (
+                  <div className="p-4 rounded-xl bg-red-950/20 border border-red-500/20 text-red-400 text-sm flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>{error}</span>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* SCREEN 2: DETAILS FORM */}
+            {currentScreen === 'form' && (
+              <div className="space-y-6 max-w-md mx-auto w-full animate-slide-in">
+                
+                {/* Form Back Button */}
+                <button
+                  onClick={() => {
+                    setCurrentScreen('calendar');
+                    setSelectedSlot(null);
+                  }}
+                  className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-300 uppercase tracking-wider transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back to Calendar
+                </button>
+
+                <h2 className="text-xl font-bold text-white">Enter Details</h2>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Jane Doe"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="jane.doe@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Phone Number (Optional)</label>
+                    <input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
+                    />
+                  </div>
+
+                  {error && (
+                    <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-500/20 text-red-400 text-xs flex items-start">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2.5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full mt-2 py-4 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-sm hover:bg-indigo-500 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/15 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <React.Fragment>
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-300"></div>
+                        <span>Scheduling...</span>
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Confirm Appointment</span>
+                      </React.Fragment>
+                    )}
+                  </button>
+                </form>
+
+              </div>
+            )}
+
+            {/* SCREEN 3: SUCCESS SCREEN */}
+            {currentScreen === 'success' && bookingSuccess && (
+              <div className="space-y-6 text-center max-w-md mx-auto w-full animate-fade-in">
+                
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 mb-2 animate-bounce">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                
+                <h2 className="text-2xl font-bold text-slate-100">Booking Confirmed!</h2>
+                <p className="text-slate-400 text-sm">Your appointment is scheduled and synced with our calendar.</p>
+                
+                <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-800 text-left space-y-3.5 text-sm">
+                  <div className="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <div>
+                      <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Client</p>
+                      <p className="text-slate-200 font-semibold">{bookingSuccess.client_name}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <div>
+                      <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Date & Time</p>
+                      <p className="text-slate-200 font-semibold">{formatDateLocal(bookingSuccess.start_time)}</p>
+                      <p className="text-slate-400 text-xs mt-0.5 font-medium">{formatTimeLocal(bookingSuccess.start_time)} - {formatTimeLocal(bookingSuccess.end_time)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
+                  A confirmation message has been sent back to your {tokenData.platform === 'instagram' ? 'Instagram' : 'Facebook Messenger'} thread. You can safely close this browser window.
+                </p>
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      );
+    }
+
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(<BookingApp />);
+  </script>
+</body>
+</html>
+

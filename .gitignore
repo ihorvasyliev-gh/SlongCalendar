@@ -1,0 +1,15 @@
+# Cloudflare Wrangler
+.wrangler/
+.dev.vars
+
+# Dependencies
+node_modules/
+
+# Logs & temp
+*.log
+.DS_Store
+
+# Local envs
+.env
+.env.local
+.env.*.local
