@@ -425,6 +425,7 @@
 
       // Check if slot details are active
       const isSlotsView = currentScreen === 'calendar' && selectedDate !== '';
+      const hideSidebarOnMobile = currentScreen !== 'calendar' || selectedDate !== '';
 
       return (
         <div className="bg-white w-full max-w-5xl md:my-8 md:rounded-lg md:shadow-[0_1px_8px_rgba(0,0,0,0.08)] md:border border-gray-200 overflow-hidden relative animate-fade-in flex flex-col min-h-[620px]">
@@ -444,38 +445,30 @@
             </button>
           </div>
 
-          {/* POWERED BY CALENDLY RIBBON */}
-          <div className="absolute top-0 right-0 w-24 h-24 overflow-hidden pointer-events-none z-50">
-            <div className="bg-[#5c6670] text-white text-[7px] font-bold uppercase tracking-wider text-center py-1 absolute top-3 -right-7 w-28 rotate-45 shadow-sm opacity-90 leading-tight">
-              powered by<br/>
-              <span className="text-[9px] tracking-normal font-extrabold lowercase">Calendly</span>
-            </div>
-          </div>
-
           {/* MAIN DUAL COLUMNS GRID */}
           <div className="grid grid-cols-1 lg:grid-cols-12 flex-grow">
             
             {/* LEFT COLUMN: Host & Event Info */}
-            {/* On mobile, this column is shown on Screen 1 (Calendar day-not-selected) and Form screen, but hidden on Screen 2 (Slots picker) */}
-            <div className={`lg:col-span-4 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-gray-150 flex flex-col bg-white ${
-              isSlotsView ? 'hidden lg:flex' : 'flex'
+            {/* On mobile, this column is shown on Screen 1 (Calendar day-not-selected) but hidden on Screen 2 (Slots picker) and Screen 3 (Form) */}
+            <div className={`lg:col-span-4 p-5 md:p-8 border-b lg:border-b-0 lg:border-r border-gray-150 flex flex-col bg-white ${
+              hideSidebarOnMobile ? 'hidden lg:flex' : 'flex'
             }`}>
               
               {/* Logo / Initials (Circle icon) */}
-              <div className="relative mb-5 flex justify-center lg:justify-start">
-                <div className="w-14 h-14 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400 font-extrabold text-xl shadow-inner">
+              <div className="relative mb-3 md:mb-5 flex justify-center lg:justify-start">
+                <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-gray-400 font-extrabold text-lg md:text-xl shadow-inner">
                   {EVENT_CONFIG.hostName.charAt(0)}
                 </div>
               </div>
 
               {/* Host and Meeting Title */}
-              <div className="text-center lg:text-left mb-6">
+              <div className="text-center lg:text-left mb-4 md:mb-6">
                 <p className="text-gray-500 text-xs font-bold tracking-wider uppercase">{EVENT_CONFIG.hostName}</p>
-                <h1 className="text-2xl font-bold text-slate-950 mt-1">{EVENT_CONFIG.meetingName}</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-950 mt-1">{EVENT_CONFIG.meetingName}</h1>
               </div>
 
               {/* Event Metadata (Icons list) */}
-              <div className="space-y-4 text-[14px] text-gray-500 flex flex-col items-center lg:items-start font-semibold mb-6">
+              <div className="space-y-2.5 md:space-y-4 text-[14px] text-gray-500 flex flex-col items-center lg:items-start font-semibold mb-4 md:mb-6">
                 <div className="flex items-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <span>{EVENT_CONFIG.durationText}</span>
@@ -525,7 +518,7 @@
                   <div className={`grid grid-cols-1 ${selectedDate ? 'lg:grid-cols-12 gap-8' : 'max-w-md mx-auto w-full'} items-start`}>
                     
                     {/* Calendar Day Picker (Spans 7 cols if date selected, otherwise full width) */}
-                    <div className={`${selectedDate ? 'lg:col-span-7' : 'lg:col-span-12'}`}>
+                    <div className={`${selectedDate ? 'hidden lg:block lg:col-span-7' : 'lg:col-span-12'}`}>
                       
                       <h2 className="text-xl font-bold text-slate-950 mb-6 text-center font-sans">Select a Day</h2>
 
@@ -695,14 +688,7 @@
                     </div>
                   )}
 
-                  {/* Troubleshoot and Cookie Settings links below the main page content on mobile */}
-                  <div className="flex flex-col items-center space-y-3 pt-6 lg:pt-10 border-t border-gray-150 max-w-sm mx-auto">
-                    <button className="flex items-center space-x-1.5 border border-gray-300 rounded-full px-5 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50 transition shadow-sm">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                      <span>Troubleshoot</span>
-                    </button>
-                    <button className="text-xs text-gray-400 hover:underline font-medium">Cookie settings</button>
-                  </div>
+
 
                 </div>
               )}
@@ -875,9 +861,7 @@
                     </button>
                   </form>
 
-                  <div className="text-center pt-2">
-                    <button className="text-xs text-gray-400 hover:underline font-medium font-semibold">Cookie settings</button>
-                  </div>
+
 
                 </div>
               )}
