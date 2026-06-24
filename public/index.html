@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Susan Booking System</title>
   <!-- Google Fonts: Outfit -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -23,22 +23,13 @@
   </script>
   <style>
     html, body {
-      height: 100%;
+      min-height: 100%;
       margin: 0;
       padding: 0;
-      overflow: hidden;
-    }
-    @media (min-width: 768px) {
-      html, body {
-        overflow: auto;
-        height: auto;
-      }
-    }
-    body {
-      background-color: #070913; /* Extremely rich deep dark */
+      background-color: #070913; /* Rich deep slate background */
     }
     .glass-card {
-      background: rgba(13, 17, 28, 0.75);
+      background: rgba(13, 17, 28, 0.7);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.04);
@@ -54,19 +45,19 @@
       pointer-events: none;
       z-index: 0;
     }
-    /* Custom scrollbar for inner scrollables */
+    /* Custom scrollbar for slot list */
     .custom-scrollbar::-webkit-scrollbar {
-      width: 4px;
+      width: 5px;
     }
     .custom-scrollbar::-webkit-scrollbar-track {
-      background: transparent;
+      background: rgba(15, 23, 42, 0.3);
     }
     .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: rgba(99, 102, 241, 0.25);
+      background: rgba(99, 102, 241, 0.3);
       border-radius: 4px;
     }
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: rgba(99, 102, 241, 0.45);
+      background: rgba(99, 102, 241, 0.5);
     }
     /* Animations */
     @keyframes fadeIn {
@@ -74,8 +65,8 @@
       to { opacity: 1; transform: scale(1); }
     }
     @keyframes slideIn {
-      from { opacity: 0; transform: translateX(8px); }
-      to { opacity: 1; transform: translateX(0); }
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in {
       animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -90,7 +81,7 @@
   <div class="ambient-glow"></div>
 
   <!-- React Mount Point -->
-  <div id="root" class="relative z-10 w-full max-w-5xl mx-auto md:px-4 py-0 md:py-8 flex-grow flex items-center justify-center h-full md:h-auto">
+  <div id="root" class="relative z-10 w-full max-w-5xl mx-auto px-4 py-8 flex-grow flex items-center justify-center">
     <!-- Server-Side Preloader / Skeleton -->
     <div class="text-center">
       <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500 mx-auto mb-4"></div>
@@ -98,7 +89,7 @@
     </div>
   </div>
 
-  <footer class="relative z-10 w-full text-center py-4 border-t border-slate-900/60 text-slate-650 text-[10px] hidden md:block">
+  <footer class="relative z-10 w-full text-center py-6 border-t border-slate-900/60 text-slate-500 text-xs">
     <p>&copy; 2026 Susan Booking System. All rights reserved. 100% Free & Self-Hosted.</p>
   </footer>
 
@@ -123,7 +114,6 @@
       const [tokenData, setTokenData] = useState(null); // { valid: boolean, platform: string }
       
       const [currentScreen, setCurrentScreen] = useState('calendar'); // 'calendar', 'form', 'success'
-      const [mobileView, setMobileView] = useState('date'); // 'date', 'slots'
       const [currentMonth, setCurrentMonth] = useState(() => {
         const d = new Date();
         d.setDate(1);
@@ -292,17 +282,6 @@
         return `${timeStr}, ${dateStr}`;
       };
 
-      const handleSelectDate = (dateStr) => {
-        setSelectedDate(dateStr);
-        setMobileView('slots');
-      };
-
-      const handleBackToCalendar = () => {
-        setSelectedDate('');
-        setSelectedSlotCandidate(null);
-        setMobileView('date');
-      };
-
       // --- CALENDAR LOGIC ---
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -322,15 +301,20 @@
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
       ];
-      const weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+      // Starting weekdays from Monday to match user screenshot
+      const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
       const year = currentMonth.getFullYear();
       const month = currentMonth.getMonth();
-      const firstDayIndex = new Date(year, month, 1).getDay();
+      const firstDay = new Date(year, month, 1);
+      const firstDayOfWeek = firstDay.getDay(); // 0 is Sunday, 1 is Monday, etc.
+      // Shift so Mon is 0, Tue is 1, ..., Sun is 6
+      const firstDayIndexMapped = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
       const totalDays = new Date(year, month + 1, 0).getDate();
 
       const calendarCells = [];
-      for (let i = 0; i < firstDayIndex; i++) {
+      for (let i = 0; i < firstDayIndexMapped; i++) {
         calendarCells.push(null);
       }
       for (let d = 1; d <= totalDays; d++) {
@@ -351,77 +335,8 @@
       horizonLimit.setDate(today.getDate() + 30);
       const isNextMonthDisabled = year >= horizonLimit.getFullYear() && month >= horizonLimit.getMonth();
 
-      // Calendar View Sub-renderer (Avoids duplicated code)
-      const renderCalendarView = () => {
-        return (
-          <React.Fragment>
-            <div className="flex items-center justify-between mb-5">
-              <span className="text-sm font-bold text-slate-100 uppercase tracking-wider">
-                {monthNames[month]} {year}
-              </span>
-              <div className="flex space-x-1.5">
-                <button
-                  disabled={isPrevMonthDisabled}
-                  onClick={handlePrevMonth}
-                  className="p-2 rounded-lg border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
-                <button
-                  disabled={isNextMonthDisabled}
-                  onClick={handleNextMonth}
-                  className="p-2 rounded-lg border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-y-2 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              {weekdays.map(day => (
-                <div key={day} className="h-6 flex items-center justify-center">{day[0]}</div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-y-2.5 gap-x-1 text-center text-xs">
-              {calendarCells.map((date, idx) => {
-                if (!date) {
-                  return <div key={`empty-${idx}`} className="h-9"></div>;
-                }
-                const isAvailable = isDateAvailable(date);
-                const dateStr = date.toISOString().split('T')[0];
-                const isSelected = selectedDate === dateStr;
-
-                return (
-                  <button
-                    key={dateStr}
-                    disabled={!isAvailable}
-                    onClick={() => handleSelectDate(dateStr)}
-                    className={`h-9 w-9 mx-auto rounded-full flex items-center justify-center transition-all ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-600/30 scale-105'
-                        : isAvailable
-                          ? 'bg-indigo-500/10 text-indigo-400 font-bold hover:bg-indigo-600 hover:text-white'
-                          : 'text-slate-800 cursor-not-allowed'
-                    }`}
-                  >
-                    {date.getDate()}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-6 flex items-center justify-center lg:justify-start text-[11px] text-slate-500 border-t border-slate-900/60 pt-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 mr-2 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              <span>Timezone: <strong className="text-slate-400 font-semibold">{userTimezone}</strong></span>
-            </div>
-          </React.Fragment>
-        );
-      };
-
       // --- RENDER STATES ---
 
-      // 1. Loading State
       if (isValidatingToken) {
         return (
           <div className="text-center py-12">
@@ -431,7 +346,6 @@
         );
       }
 
-      // 2. Token Invalid State
       if (!tokenData || !tokenData.valid) {
         return (
           <div className="glass-card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl border border-red-950/30 animate-fade-in mx-4">
@@ -446,68 +360,53 @@
         );
       }
 
-      // 3. Main Split-screen App Container
       return (
-        <div className="glass-card w-full max-w-5xl h-screen md:h-auto md:max-h-[680px] md:rounded-2xl md:shadow-2xl md:border border-slate-800/80 overflow-hidden flex flex-col lg:grid lg:grid-cols-12 animate-fade-in">
+        <div className="glass-card w-full max-w-5xl md:my-8 md:rounded-2xl md:shadow-2xl md:border border-slate-800/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 animate-fade-in">
           
-          {/* MOBILE COMPACT HEADER (Visible on mobile only) */}
-          <div className="lg:hidden flex-shrink-0 h-16 border-b border-slate-800/80 flex items-center justify-between px-6 bg-slate-950/40">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-extrabold text-sm shadow-md">
-                S
-              </div>
-              <div>
-                <h1 className="text-xs font-bold text-white leading-tight">1-on-1 Consultation</h1>
-                <p className="text-[10px] text-slate-400 font-semibold">Susan • 60 Mins</p>
-              </div>
-            </div>
-            <span className="text-[9px] bg-slate-800 text-slate-300 font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-              {tokenData.platform === 'instagram' ? 'IG' : 'FB'}
-            </span>
-          </div>
-
-          {/* DESKTOP SIDEBAR: Host & Meeting Details (Visible on desktop only) */}
-          <div className="hidden lg:flex lg:col-span-4 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-slate-800 flex-col justify-between bg-slate-900/20">
+          {/* LEFT SIDEBAR: Host & Meeting Details (Visible at the top on mobile, left column on desktop) */}
+          <div className="lg:col-span-4 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col justify-between bg-slate-900/20">
             <div>
-              <div className="relative mb-6">
+              <div className="relative mb-6 flex justify-center lg:justify-start">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white font-extrabold text-2xl shadow-lg shadow-indigo-500/20">
                   S
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center" title="Online">
+                <div className="absolute bottom-0 right-[calc(50%-32px)] lg:right-auto lg:-bottom-1 lg:-right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center" title="Online">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
                 </div>
               </div>
 
-              <p className="text-slate-400 text-xs font-semibold tracking-wide uppercase">Susan</p>
-              <h1 className="text-xl font-bold text-white mt-1 mb-6">1-on-1 Consultation</h1>
+              <div className="text-center lg:text-left">
+                <p className="text-slate-400 text-xs font-semibold tracking-wide uppercase">Susan</p>
+                <h1 className="text-2xl font-bold text-white mt-1 mb-6">1-on-1 Consultation</h1>
+              </div>
 
-              <div className="space-y-4 text-xs text-slate-300">
+              <div className="space-y-4 text-sm text-slate-300 flex flex-col items-center lg:items-start mb-6">
                 <div className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <span className="font-medium">60 Mins</span>
                 </div>
                 <div className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
                   <span className="font-medium">Online/Chat support</span>
                 </div>
                 <div className="flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-slate-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                   <span className="font-medium capitalize">{tokenData.platform === 'instagram' ? 'Instagram Direct' : 'Facebook Messenger'}</span>
                 </div>
               </div>
 
-              <p className="text-slate-400 text-xs mt-6 leading-relaxed">
+              <p className="text-slate-400 text-sm leading-relaxed text-center lg:text-left">
                 Welcome! Please select an available date and time slot. Our appointment will be synced automatically, and a confirmation text will be sent to your {tokenData.platform === 'instagram' ? 'Instagram' : 'Facebook Messenger'} thread.
               </p>
             </div>
 
             {(currentScreen === 'form' || currentScreen === 'success') && selectedSlot && (
               <div className="mt-8 pt-6 border-t border-slate-800/80 animate-fade-in">
-                <div className="flex items-start bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 mr-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <div className="text-[10px]">
+                <div className="flex items-start bg-indigo-950/30 border border-indigo-500/20 rounded-xl p-4 max-w-sm mx-auto lg:max-w-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-400 mr-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <div className="text-xs text-left">
                     <p className="text-indigo-300 font-semibold uppercase tracking-wider mb-1">Selected Appointment</p>
-                    <p className="text-slate-200 font-semibold text-xs leading-snug">{formatSlotRange(selectedSlot)}</p>
+                    <p className="text-slate-200 font-semibold text-sm leading-snug">{formatSlotRange(selectedSlot)}</p>
                     <p className="text-slate-400 mt-1 font-medium">{userTimezone} Timezone</p>
                   </div>
                 </div>
@@ -516,27 +415,89 @@
           </div>
 
           {/* RIGHT COLUMN: Interactive Work Area */}
-          <div className="lg:col-span-8 flex flex-col overflow-hidden">
+          <div className="lg:col-span-8 p-6 md:p-8 flex flex-col justify-center">
 
             {/* SCREEN 1: CALENDAR & SLOTS */}
             {currentScreen === 'calendar' && (
-              <div className="flex-grow flex flex-col overflow-hidden p-6 md:p-8">
+              <div className="space-y-6">
                 
                 {/* Heading */}
-                <h2 className="text-base font-bold text-white mb-4 flex-shrink-0">Select a Date & Time</h2>
+                <h2 className="text-xl font-bold text-white mb-2 text-center lg:text-left">Select a Date & Time</h2>
 
-                {/* Desktop Layout (Side-by-side grid) */}
-                <div className="hidden lg:grid lg:grid-cols-12 gap-8 items-start flex-grow overflow-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                   
-                  {/* Monthly Calendar */}
-                  <div className={`${selectedDate ? 'col-span-7' : 'col-span-12 max-w-md mx-auto w-full'}`}>
-                    {renderCalendarView()}
+                  {/* Monthly Calendar View */}
+                  <div className={`${selectedDate ? 'lg:col-span-7' : 'lg:col-span-12 max-w-md mx-auto w-full'}`}>
+                    
+                    {/* Centered Navigator Switcher */}
+                    <div className="flex items-center justify-center space-x-6 mb-6">
+                      <button
+                        disabled={isPrevMonthDisabled}
+                        onClick={handlePrevMonth}
+                        className="p-2 rounded-lg border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                      <span className="text-base font-bold text-slate-100 uppercase tracking-wider min-w-[120px] text-center">
+                        {monthNames[month]} {year}
+                      </span>
+                      <button
+                        disabled={isNextMonthDisabled}
+                        onClick={handleNextMonth}
+                        className="p-2 rounded-lg border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    </div>
+
+                    {/* Weekday Names (Starting with Mon) */}
+                    <div className="grid grid-cols-7 gap-y-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
+                      {weekdays.map(day => (
+                        <div key={day} className="h-6 flex items-center justify-center">{day}</div>
+                      ))}
+                    </div>
+
+                    {/* Days Grid */}
+                    <div className="grid grid-cols-7 gap-y-3.5 gap-x-2 text-center text-sm">
+                      {calendarCells.map((date, idx) => {
+                        if (!date) {
+                          return <div key={`empty-${idx}`} className="h-10 sm:h-11"></div>;
+                        }
+                        const isAvailable = isDateAvailable(date);
+                        const dateStr = date.toISOString().split('T')[0];
+                        const isSelected = selectedDate === dateStr;
+
+                        return (
+                          <button
+                            key={dateStr}
+                            disabled={!isAvailable}
+                            onClick={() => setSelectedDate(dateStr)}
+                            className={`h-10 w-10 sm:h-11 sm:w-11 mx-auto rounded-full flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/30 scale-105'
+                                : isAvailable
+                                  ? 'bg-indigo-550/15 text-indigo-400 font-bold hover:bg-indigo-600 hover:text-white'
+                                  : 'text-slate-800 cursor-not-allowed'
+                            }`}
+                          >
+                            {date.getDate()}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Timezone Info */}
+                    <div className="mt-8 flex items-center justify-center lg:justify-start text-xs text-slate-500 border-t border-slate-900/60 pt-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2 text-slate-655" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                      <span>Timezone: <strong className="text-slate-400 font-semibold">{userTimezone}</strong></span>
+                    </div>
+
                   </div>
 
-                  {/* Desktop Slot Selector */}
+                  {/* Vertical Time Slots Selector */}
                   {selectedDate && (
-                    <div className="col-span-5 space-y-4 animate-slide-in flex flex-col h-full overflow-hidden">
-                      <p className="text-xs font-semibold text-slate-400 capitalize flex-shrink-0">
+                    <div className="lg:col-span-5 space-y-4 animate-slide-in">
+                      <p className="text-sm font-semibold text-slate-400 capitalize text-center lg:text-left">
                         {new Date(selectedDate).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}
                       </p>
 
@@ -547,76 +508,7 @@
                           ))}
                         </div>
                       ) : slots.length > 0 ? (
-                        <div className="flex-grow overflow-y-auto pr-1 space-y-2 custom-scrollbar pb-2">
-                          {slots.map((slot) => {
-                            const isCandidate = selectedSlotCandidate && selectedSlotCandidate.start === slot.start;
-                            return (
-                              <div key={slot.start} className="flex gap-2 transition-all duration-200">
-                                <button
-                                  onClick={() => setSelectedSlotCandidate(slot)}
-                                  className={`flex-grow py-3 px-4 rounded-xl border text-xs font-semibold transition-all duration-200 ${
-                                    isCandidate
-                                      ? 'bg-slate-800/60 border-slate-700 text-indigo-400 w-1/2'
-                                      : 'border-slate-800 bg-slate-900/40 text-slate-200 hover:border-indigo-500/50 hover:bg-slate-800/20 w-full'
-                                  }`}
-                                >
-                                  {formatTimeLocal(slot.start)}
-                                </button>
-                                {isCandidate && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedSlot(slot);
-                                      setCurrentScreen('form');
-                                    }}
-                                    className="w-1/2 py-3 px-4 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-xs hover:bg-indigo-500 transition-all duration-200 shadow-md shadow-indigo-600/10"
-                                  >
-                                    Next
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-10 bg-slate-900/20 border border-slate-900 rounded-xl flex flex-col items-center justify-center space-y-2 flex-grow">
-                          <p className="text-xs text-slate-500 font-medium">No slots available</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Mobile Layout (Step-by-step wizard) */}
-                <div className="lg:hidden flex-grow flex flex-col overflow-hidden">
-                  {mobileView === 'date' ? (
-                    <div className="flex-grow flex flex-col justify-center max-w-md mx-auto w-full">
-                      {renderCalendarView()}
-                    </div>
-                  ) : (
-                    <div className="flex-grow flex flex-col overflow-hidden animate-slide-in">
-                      {/* Back button */}
-                      <div className="flex-shrink-0 flex items-center justify-between mb-4">
-                        <button
-                          onClick={handleBackToCalendar}
-                          className="flex items-center text-xs font-bold text-slate-400 hover:text-slate-200 bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-2.5 w-fit transition"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                          Back to Calendar
-                        </button>
-                        <span className="text-[11px] text-slate-400 font-bold capitalize">
-                          {new Date(selectedDate).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </span>
-                      </div>
-
-                      {/* Scrollable Slot selection list */}
-                      {isLoadingSlots ? (
-                        <div className="space-y-3">
-                          {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-12 bg-slate-800/30 animate-pulse rounded-xl border border-slate-900"></div>
-                          ))}
-                        </div>
-                      ) : slots.length > 0 ? (
-                        <div className="flex-grow overflow-y-auto pr-1 space-y-2.5 custom-scrollbar pb-6">
+                        <div className="space-y-2.5 max-h-[350px] lg:max-h-[380px] overflow-y-auto pr-1 custom-scrollbar">
                           {slots.map((slot) => {
                             const isCandidate = selectedSlotCandidate && selectedSlotCandidate.start === slot.start;
                             return (
@@ -625,7 +517,7 @@
                                   onClick={() => setSelectedSlotCandidate(slot)}
                                   className={`flex-grow py-3.5 px-4 rounded-xl border text-sm font-semibold transition-all duration-200 ${
                                     isCandidate
-                                      ? 'bg-slate-800/60 border-slate-700 text-indigo-400 w-1/2'
+                                      ? 'bg-slate-850/60 border-slate-700 text-indigo-400 w-1/2'
                                       : 'border-slate-800 bg-slate-900/40 text-slate-200 hover:border-indigo-500/50 hover:bg-slate-800/20 w-full'
                                   }`}
                                 >
@@ -637,7 +529,7 @@
                                       setSelectedSlot(slot);
                                       setCurrentScreen('form');
                                     }}
-                                    className="w-1/2 py-3.5 px-4 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-sm hover:bg-indigo-500 transition-all duration-200 shadow-md"
+                                    className="w-1/2 py-3.5 px-4 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-sm hover:bg-indigo-500 transition-all duration-200 shadow-md shadow-indigo-600/10"
                                   >
                                     Next
                                   </button>
@@ -647,19 +539,20 @@
                           })}
                         </div>
                       ) : (
-                        <div className="flex-grow flex flex-col items-center justify-center text-center py-10 bg-slate-900/20 border border-slate-900 rounded-xl space-y-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>
+                        <div className="text-center py-10 bg-slate-900/20 border border-slate-900 rounded-xl flex flex-col items-center justify-center space-y-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>
                           <p className="text-sm text-slate-500 font-medium">No slots available today</p>
                           <p className="text-xs text-slate-600">Please choose another calendar date.</p>
                         </div>
                       )}
                     </div>
                   )}
+
                 </div>
 
                 {error && (
-                  <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-500/20 text-red-400 text-xs flex items-start flex-shrink-0 mt-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2.5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <div className="p-4 rounded-xl bg-red-950/20 border border-red-500/20 text-red-400 text-sm flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     <span>{error}</span>
                   </div>
                 )}
@@ -669,95 +562,81 @@
 
             {/* SCREEN 2: DETAILS FORM */}
             {currentScreen === 'form' && (
-              <div className="flex-grow flex flex-col overflow-hidden p-6 md:p-8 animate-slide-in">
+              <div className="space-y-6 max-w-md mx-auto w-full animate-slide-in">
                 
-                {/* Form Back Button */}
-                <div className="flex-shrink-0 mb-4">
-                  <button
-                    onClick={() => {
-                      setCurrentScreen('calendar');
-                      setSelectedSlot(null);
-                      setMobileView('slots');
-                    }}
-                    className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-300 uppercase tracking-wider transition"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                    Back to Times
-                  </button>
-                </div>
+                <button
+                  onClick={() => {
+                    setCurrentScreen('calendar');
+                    setSelectedSlot(null);
+                  }}
+                  className="inline-flex items-center text-xs font-semibold text-slate-500 hover:text-slate-300 uppercase tracking-wider transition"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back to Calendar
+                </button>
 
-                {/* Appointment summary on mobile */}
-                <div className="lg:hidden flex-shrink-0 mb-4 bg-indigo-950/20 border border-indigo-500/10 rounded-xl p-3.5 text-[10px]">
-                  <p className="text-indigo-400 font-bold uppercase tracking-wider mb-0.5">Selected Time</p>
-                  <p className="text-slate-300 font-semibold">{formatSlotRange(selectedSlot)}</p>
-                </div>
+                <h2 className="text-xl font-bold text-white">Enter Details</h2>
 
-                <h2 className="text-base font-bold text-white mb-4 flex-shrink-0">Enter Details</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Jane Doe"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
+                    />
+                  </div>
 
-                <form onSubmit={handleSubmit} className="flex-grow flex flex-col overflow-hidden">
-                  <div className="flex-grow overflow-y-auto pr-1 space-y-4 pb-4 custom-scrollbar">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Full Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Jane Doe"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="jane.doe@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Email Address</label>
-                      <input
-                        type="email"
-                        required
-                        placeholder="jane.doe@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Phone Number (Optional)</label>
-                      <input
-                        type="tel"
-                        placeholder="+1 (555) 123-4567"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Phone Number (Optional)</label>
+                    <input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-slate-950/60 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl px-4 py-3 text-sm text-slate-200 outline-none transition"
+                    />
                   </div>
 
                   {error && (
-                    <div className="flex-shrink-0 p-3 rounded-xl bg-red-950/20 border border-red-500/20 text-red-400 text-xs flex items-start mb-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <div className="p-3.5 rounded-xl bg-red-950/20 border border-red-500/20 text-red-400 text-xs flex items-start">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2.5 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                       <span>{error}</span>
                     </div>
                   )}
 
-                  <div className="flex-shrink-0 pt-3 border-t border-slate-900/60">
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full py-3.5 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-sm hover:bg-indigo-500 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/15 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? (
-                        <React.Fragment>
-                          <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-300"></div>
-                          <span>Scheduling...</span>
-                        </React.Fragment>
-                      ) : (
-                        <React.Fragment>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                          <span>Confirm Appointment</span>
-                        </React.Fragment>
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full mt-2 py-4 rounded-xl bg-indigo-600 border border-indigo-500 text-white font-bold text-sm hover:bg-indigo-500 transition-all duration-200 flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/15 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <React.Fragment>
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-indigo-300"></div>
+                        <span>Scheduling...</span>
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Confirm Appointment</span>
+                      </React.Fragment>
+                    )}
+                  </button>
                 </form>
 
               </div>
@@ -765,34 +644,34 @@
 
             {/* SCREEN 3: SUCCESS SCREEN */}
             {currentScreen === 'success' && bookingSuccess && (
-              <div className="flex-grow flex flex-col overflow-y-auto p-6 md:p-8 justify-center items-center text-center animate-fade-in custom-scrollbar">
+              <div className="space-y-6 text-center max-w-md mx-auto w-full animate-fade-in">
                 
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-500 mb-4 animate-bounce flex-shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 mb-2 animate-bounce">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
                 
-                <h2 className="text-xl font-bold text-slate-100 flex-shrink-0 mb-1">Booking Confirmed!</h2>
-                <p className="text-slate-400 text-xs mb-5 flex-shrink-0">Your appointment is scheduled and synced with our calendar.</p>
+                <h2 className="text-2xl font-bold text-slate-100">Booking Confirmed!</h2>
+                <p className="text-slate-400 text-sm">Your appointment is scheduled and synced with our calendar.</p>
                 
-                <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-800 text-left space-y-3.5 text-xs w-full max-w-sm mb-5 flex-shrink-0">
+                <div className="bg-slate-900/40 rounded-xl p-5 border border-slate-800 text-left space-y-3.5 text-sm">
                   <div className="flex items-start">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <div>
-                      <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Client</p>
+                      <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Client</p>
                       <p className="text-slate-200 font-semibold">{bookingSuccess.client_name}</p>
                     </div>
                   </div>
                   <div className="flex items-start">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-indigo-400 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <div>
-                      <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Date & Time</p>
+                      <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider mb-0.5">Date & Time</p>
                       <p className="text-slate-200 font-semibold">{formatDateLocal(bookingSuccess.start_time)}</p>
-                      <p className="text-slate-400 text-[11px] mt-0.5 font-medium">{formatTimeLocal(bookingSuccess.start_time)} - {formatTimeLocal(bookingSuccess.end_time)}</p>
+                      <p className="text-slate-400 text-xs mt-0.5 font-medium">{formatTimeLocal(bookingSuccess.start_time)} - {formatTimeLocal(bookingSuccess.end_time)}</p>
                     </div>
                   </div>
                 </div>
 
-                <p className="text-[11px] text-slate-500 leading-relaxed max-w-sm flex-shrink-0">
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm mx-auto">
                   A confirmation message has been sent back to your {tokenData.platform === 'instagram' ? 'Instagram' : 'Facebook Messenger'} thread. You can safely close this browser window.
                 </p>
               </div>
