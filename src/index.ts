@@ -289,6 +289,8 @@ async function handleBook(request: Request, env: Env): Promise<Response> {
       email: string;
       phone?: string;
       slotStart: string; // ISO string
+      notes?: string;
+      guests?: string[];
     };
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
@@ -297,7 +299,7 @@ async function handleBook(request: Request, env: Env): Promise<Response> {
     });
   }
 
-  const { token, name, email, phone, slotStart } = body;
+  const { token, name, email, phone, slotStart, notes, guests } = body;
   if (!token || !name || !email || !slotStart) {
     return new Response(JSON.stringify({ error: 'Missing required parameters: token, name, email, slotStart' }), {
       status: 400,
@@ -357,7 +359,13 @@ async function handleBook(request: Request, env: Env): Promise<Response> {
       timeStyle: 'short'
     });
 
-    const eventDescription = `Client: ${name}\nEmail: ${email}\nPhone: ${phone || 'N/A'}\nPlatform: ${tokenRow.platform}\nMeta User ID: ${tokenRow.sender_id}\nBooking Token: ${token}`;
+    let eventDescription = `Client: ${name}\nEmail: ${email}\nPhone: ${phone || 'N/A'}\nPlatform: ${tokenRow.platform}\nMeta User ID: ${tokenRow.sender_id}\nBooking Token: ${token}`;
+    if (guests && guests.length > 0) {
+      eventDescription += `\nGuests:\n- ${guests.join('\n- ')}`;
+    }
+    if (notes) {
+      eventDescription += `\n\nNotes:\n${notes}`;
+    }
     
     const gEvent = await gCal.createEvent({
       summary: `Booking - ${name}`,
